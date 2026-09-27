@@ -17,7 +17,7 @@ The Patent Office does not publish most filings on the day they are filed. Utili
 
 ## What runs
 
-**Quantum class alerts** runs every day at 14:30 UTC (10:30am US Eastern). It needs no AI. It files one issue and assigns you.
+**Quantum class alerts** runs every day at 8:30am US Eastern Daylight Time (12:30 UTC). It needs no AI. It files one issue and assigns you. The email follows a minute or two later. After the clocks change in November, this same schedule is 7:30am Eastern until it is shifted.
 
 **Quantum patent watch** is the Copilot review of the same candidate list. It is manual only. This account's Copilot plan rejects every model that workflow can request, which is the same limit as the nanotech agent. After Copilot includes `gpt-5-mini`, start it from the Actions tab.
 
