@@ -65,7 +65,7 @@ def already_mentioned(needle: str) -> bool:
     return needle in known_text()
 
 
-def digest(docs: list[dict], start: str, end: str, shown: int, truncated: bool) -> list[str]:
+def digest(docs: list[dict], start: str, end: str, shown: int, truncated: bool, dropped: int) -> list[str]:
     grants = sum(1 for doc in docs if doc.get("grantDate"))
     orgs: Counter[str] = Counter()
     highlights = []
@@ -79,7 +79,7 @@ def digest(docs: list[dict], start: str, end: str, shown: int, truncated: bool) 
             highlights.append(f"- {title} ({number})")
     lines = [
         "## Digest",
-        f"{len(docs)} quantum-technology document(s) between {start} and {end}.",
+        f"{len(docs)} quantum-technology document(s) kept between {start} and {end} after a rules review, without Copilot.",
         f"{grants} have a grant date. {len(docs) - grants} do not, so they are publications rather than new grants.",
     ]
     if orgs:
@@ -91,8 +91,10 @@ def digest(docs: list[dict], start: str, end: str, shown: int, truncated: bool) 
         lines.extend(highlights[:12])
         lines.append("")
     lines.append(
-        "G06N 10 is quantum computing. H04B 10/70 is photonic quantum communication. H04L 9/085 is quantum key distribution. Title-only hits are included because they use those words. Post-quantum cryptography that never mentions a qubit or a quantum computer is left out."
+        "Reviewed without Copilot. Kept for G06N 10, H04B 10/70, H04L 9/085, or a title that names a qubit, quantum computer, quantum key distribution, quantum sensor, or quantum communication. Post-quantum cryptography, quantum dots, and quantum-efficiency patents are set aside unless a qubit or quantum computer is also named."
     )
+    if dropped:
+        lines.append(f"Set aside {dropped} other candidate(s) under those rules.")
     if truncated or len(docs) > shown:
         lines.append(f"The first {shown} of {len(docs)} are listed below.")
     lines.append("")
@@ -173,6 +175,41 @@ def post_quantum_only(item: dict) -> bool:
     return "qubit" not in title and "quantum comput" not in title
 
 
+def review(item: dict) -> bool:
+    """Same include and exclude rules the Copilot review was going to apply."""
+    if post_quantum_only(item):
+        return False
+    title = str(item.get("title") or "").lower()
+    reason = item.get("matchedBy") or ""
+    codes = [str(code).upper().replace(" ", "") for code in (item.get("cpcNano") or [])]
+    official = any(
+        code.startswith("G06N10") or "H04B10/70" in code or code.startswith("H04L9/085")
+        for code in codes
+    ) or any(tag in reason for tag in ("cpc-g06n10", "cpc-qkd"))
+    real_title = any(
+        phrase in title
+        for phrase in (
+            "qubit",
+            "quantum comput",
+            "quantum gate",
+            "quantum key",
+            "quantum anneal",
+            "quantum sensor",
+            "quantum sensing",
+            "quantum communication",
+            "quantum processor",
+            "quantum error",
+        )
+    )
+    photonics_only = any(
+        phrase in title
+        for phrase in ("quantum dot", "quantum well", "quantum efficiency", "quantum yield")
+    )
+    if photonics_only and not real_title and not official:
+        return False
+    return official or real_title
+
+
 def main() -> int:
     if not TOKEN:
         print("GH_TOKEN is not set", file=sys.stderr)
@@ -190,11 +227,10 @@ def main() -> int:
 
     window = payload.get("window") or {}
     official = []
+    dropped = 0
     for item in payload.get("documents") or []:
         reason = item.get("matchedBy") or ""
         if "cpc" not in reason and "title" not in reason:
-            continue
-        if post_quantum_only(item):
             continue
         keys = [
             item.get("applicationNumber"),
@@ -203,17 +239,20 @@ def main() -> int:
         ]
         if any(key and already_mentioned(str(key)) for key in keys):
             continue
+        if not review(item):
+            dropped += 1
+            continue
         official.append(item)
 
     if not official:
-        print(f"no new quantum technology documents ({error or 'ok'})")
+        print(f"no new quantum technology documents after review ({error or 'ok'}, set aside {dropped})")
         return 0
 
     start = window.get("from", "")
     end = window.get("to", "")
     title = f"[quantum] {end}: {len(official)} quantum technology document(s)"
     shown = 25
-    body = digest(official, start, end, shown, bool(payload.get("truncated")))
+    body = digest(official, start, end, shown, bool(payload.get("truncated")), dropped)
     body.append(f"Newly granted or published between {start} and {end}. Classified in G06N 10, H04B 10/70, or H04L 9/085, or titled as a qubit, quantum computer, quantum key distribution, quantum sensor, or quantum communication invention.")
     body.append("")
     body.extend(document_lines(item) + "\n" for item in official[:shown])
