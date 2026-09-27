@@ -29,3 +29,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 scripts/file_class_alerts.py "$GITHUB_WORKSPACE/uspto-candidates.json"
+
+
+# registered
