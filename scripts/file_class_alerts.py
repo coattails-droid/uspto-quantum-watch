@@ -29,7 +29,7 @@ def gh(method: str, path: str, body: dict | None = None) -> dict | list:
         headers={
             "authorization": f"Bearer {TOKEN}",
             "accept": "application/vnd.github+json",
-            "user-agent": "uspto-nanotech-watch",
+            "user-agent": "uspto-quantum-watch",
             "x-github-api-version": "2022-11-28",
         },
         method=method,
@@ -184,7 +184,7 @@ def main() -> int:
         if already_mentioned("USPTO API key required"):
             print("setup issue already exists")
             return 0
-        url = create_issue("[nanotech] USPTO API key required", setup_body())
+        url = create_issue("[quantum] USPTO API key required", setup_body())
         print(url)
         return 0
 
